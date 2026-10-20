@@ -37,13 +37,14 @@ public final class PetBedNetwork {
             NetworkEvent.Context ctx=context.get(); ServerPlayer player=ctx.getSender();
             if (player != null) {
                 BlockPos pos=m.pos;
+                net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel) player.level;
                 if (player.containerMenu instanceof PetBedMenu menu && menu.getPos().equals(pos) && player.distanceToSqr(pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5) <= 64.0D
-                        && player.serverLevel().getBlockEntity(pos) instanceof PetBedBlockEntity bed) {
+                        && level.getBlockEntity(pos) instanceof PetBedBlockEntity bed) {
                     boolean ok=false;
                     if (m.action == 0 && m.petId != null && bed.getPetId() == null) {
-                        Entity entity=player.serverLevel().getEntity(m.petId);
-                        if (entity instanceof Mob pet) ok=PetLinkService.link(player, player.serverLevel(), bed, pet);
-                    } else if (m.action == 1) ok=PetLinkService.unlink(player, player.serverLevel(), bed);
+                        Entity entity=level.getEntity(m.petId);
+                        if (entity instanceof Mob pet) ok=PetLinkService.link(player, level, bed, pet);
+                    } else if (m.action == 1) ok=PetLinkService.unlink(player, level, bed);
                     sendStatus(player, bed);
                     if (!ok) player.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.petbed.action_failed"), true);
                 }
@@ -53,9 +54,10 @@ public final class PetBedNetwork {
     }
 
     private static void sendStatus(ServerPlayer player, PetBedBlockEntity bed) {
-        Entity entity=bed.getPetId()==null?null:player.serverLevel().getEntity(bed.getPetId());
+        net.minecraft.server.level.ServerLevel level=(net.minecraft.server.level.ServerLevel) player.level;
+        Entity entity=bed.getPetId()==null?null:level.getEntity(bed.getPetId());
         Mob pet=entity instanceof Mob m && PetBedPets.isTamedPet(m)?m:null;
-        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new StatusMessage(bed.getPetId(), pet==null?"Pet indisponível":pet.getDisplayName().getString(), pet==null?"—":pet.getType().getDescription().getString(), PetBedMenu.status(pet,player.level,bed.getBlockPos()), PetBedMenu.distance(pet,bed.getBlockPos())));
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new StatusMessage(bed.getPetId(), pet==null?"Pet indisponível":pet.getDisplayName().getString(), pet==null?"—":pet.getType().getDescription().getString(), PetBedMenu.status(pet,level,bed.getBlockPos()), PetBedMenu.distance(pet,bed.getBlockPos())));
     }
 
     public record StatusMessage(UUID petId, String name, String species, String state, String distance) {

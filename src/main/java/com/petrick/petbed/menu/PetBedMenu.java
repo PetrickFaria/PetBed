@@ -12,7 +12,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
-import net.minecraft.world.inventory.MenuProvider;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
@@ -44,16 +44,17 @@ public class PetBedMenu extends AbstractContainerMenu {
 
     public static void writeOpenData(FriendlyByteBuf buf, ServerPlayer player, PetBedBlockEntity bed) {
         buf.writeBlockPos(bed.getBlockPos());
-        Mob pet = bed.getPetId() == null ? null : player.serverLevel().getEntity(bed.getPetId()) instanceof Mob m ? m : null;
+        net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel) player.level;
+        Mob pet = bed.getPetId() == null ? null : level.getEntity(bed.getPetId()) instanceof Mob m ? m : null;
         buf.writeBoolean(bed.getPetId() != null);
         if (bed.getPetId() != null) {
             buf.writeUUID(bed.getPetId());
             buf.writeUtf(pet == null ? "Pet indisponível" : pet.getDisplayName().getString(), 128);
             buf.writeUtf(pet == null ? "—" : pet.getType().getDescription().getString(), 128);
-            buf.writeUtf(status(pet, player.serverLevel(), bed.getBlockPos()), 64);
+            buf.writeUtf(status(pet, level, bed.getBlockPos()), 64);
             buf.writeUtf(distance(pet, bed.getBlockPos()), 64);
         }
-        List<Mob> eligible = player.serverLevel().getEntitiesOfClass(Mob.class,
+        List<Mob> eligible = level.getEntitiesOfClass(Mob.class,
                 new AABB(bed.getBlockPos()).inflate(8), candidate -> candidate.isAlive() && PetBedPets.isTamedPet(candidate)
                         && player.getUUID().equals(PetBedPets.getOwnerId(candidate)) && candidate.getPersistentData().getCompound(PetLinkService.DATA_KEY).isEmpty());
         buf.writeVarInt(eligible.size());
@@ -85,6 +86,7 @@ public class PetBedMenu extends AbstractContainerMenu {
     public String getDistance() { return distance; }
     public void updateStatus(@Nullable UUID id, String name, String kind, String status, String range) { petId = id; petName = name; species = kind; state = status; distance = range; }
     @Override public boolean canTakeItemForPickAll(net.minecraft.world.item.ItemStack stack, net.minecraft.world.inventory.Slot slot) { return false; }
+    @Override public net.minecraft.world.item.ItemStack quickMoveStack(Player player, int index) { return net.minecraft.world.item.ItemStack.EMPTY; }
 
     public static class Provider implements MenuProvider {
         private final PetBedBlockEntity bed;

@@ -2,7 +2,7 @@ package com.petrick.petbed.api;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Mob;
-import net.minecraft.world.entity.animal.TamableAnimal;
+import net.minecraft.world.entity.TamableAnimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
