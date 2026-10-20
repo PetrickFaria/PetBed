@@ -1,0 +1,30 @@
+plugins {
+    id 'eclipse'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[5.1,)' 
+}
+
+version = mod_version
+group = mod_group
+base { archivesName = 'PetBed' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'official', version: minecraft_version
+    runs {
+        configureEach { workingDirectory project.file('run'); property 'forge.logging.console.level', 'debug'; mods { petbed { source sourceSets.main } } }
+        client {}
+        server { args '--nogui' }
+    }
+}
+
+repositories { maven { url = 'https://maven.minecraftforge.net/' } }
+dependencies { minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}" }
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [mod_id: mod_id, mod_name: 'PetBed', mod_version: mod_version, minecraft_version: minecraft_version, forge_version: forge_version]
+    inputs.properties replaceProperties
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) { expand replaceProperties }
+}
+
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.release = 17 }

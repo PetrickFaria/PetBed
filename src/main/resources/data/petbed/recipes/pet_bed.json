@@ -1,0 +1,6 @@
+{
+  "type":"minecraft:crafting_shaped",
+  "pattern":["WWW","WMW","WWW"],
+  "key":{"W":{"tag":"minecraft:planks"},"M":{"item":"minecraft:white_wool"}},
+  "result":{"item":"petbed:pet_bed","count":1}
+}
