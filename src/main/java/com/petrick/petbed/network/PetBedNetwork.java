@@ -29,6 +29,7 @@ public final class PetBedNetwork {
         CHANNEL.messageBuilder(ActionMessage.class, 0).encoder(ActionMessage::encode).decoder(ActionMessage::decode).consumerMainThread(ActionMessage::handle).add();
         CHANNEL.messageBuilder(StatusMessage.class, 1).encoder(StatusMessage::encode).decoder(StatusMessage::decode).consumerMainThread(StatusMessage::handle).add();
         CHANNEL.messageBuilder(ControlMessage.class, 2).encoder(ControlMessage::encode).decoder(ControlMessage::decode).consumerMainThread(ControlMessage::handle).add();
+        CHANNEL.messageBuilder(ControlStatusMessage.class, 3).encoder(ControlStatusMessage::encode).decoder(ControlStatusMessage::decode).consumerMainThread(ControlStatusMessage::handle).add();
     }
 
     public static void sendAction(BlockPos pos, int action, UUID petId) { CHANNEL.sendToServer(new ActionMessage(pos, action, petId, 0)); }
@@ -85,7 +86,18 @@ public final class PetBedNetwork {
                 Entity entity=level.getEntity(m.entityId);
                 PetBedMode mode= m.mode==1?PetBedMode.SIT:m.mode==2?PetBedMode.FOLLOW:PetBedMode.FREE;
                 if(entity!=null && entity.getUUID().equals(menu.getPetId()) && PetLinkService.setMode(player,level,entity,mode)) player.displayClientMessage(net.minecraft.network.chat.Component.literal("Modo do pet: "+mode.id()),true);
+                if(entity instanceof Mob pet && entity.getUUID().equals(menu.getPetId())) CHANNEL.send(PacketDistributor.PLAYER.with(()->player),new ControlStatusMessage(m.entityId,PetBedMenu.posture(pet),PetLinkService.getMode(pet).id(),PetBedMenu.status(pet,level,PetLinkService.getBedPos(pet)),PetBedMenu.distance(pet,PetLinkService.getBedPos(pet))));
             }
+            ctx.setPacketHandled(true);
+        }
+    }
+
+    public record ControlStatusMessage(int entityId,String posture,String mode,String state,String distance) {
+        static void encode(ControlStatusMessage m,FriendlyByteBuf b){b.writeVarInt(m.entityId);b.writeUtf(m.posture,32);b.writeUtf(m.mode,32);b.writeUtf(m.state,64);b.writeUtf(m.distance,64);}
+        static ControlStatusMessage decode(FriendlyByteBuf b){return new ControlStatusMessage(b.readVarInt(),b.readUtf(32),b.readUtf(32),b.readUtf(64),b.readUtf(64));}
+        static void handle(ControlStatusMessage m,Supplier<NetworkEvent.Context> context){
+            NetworkEvent.Context ctx=context.get();
+            net.minecraftforge.fml.DistExecutor.unsafeRunWhenOn(net.minecraftforge.api.distmarker.Dist.CLIENT,()->()->com.petrick.petbed.client.PetControlScreen.applyStatus(m.entityId,m.posture,m.mode,m.state,m.distance));
             ctx.setPacketHandled(true);
         }
     }

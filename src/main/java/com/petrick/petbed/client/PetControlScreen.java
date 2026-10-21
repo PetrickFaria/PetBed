@@ -10,7 +10,12 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
 public class PetControlScreen extends AbstractContainerScreen<PetControlMenu> {
-    public PetControlScreen(PetControlMenu menu, Inventory inventory, Component title){super(menu,inventory,title); imageWidth=240; imageHeight=150;}
+    private static PetControlScreen current;
+    public PetControlScreen(PetControlMenu menu, Inventory inventory, Component title){super(menu,inventory,title); imageWidth=240; imageHeight=150; current=this;}
+    public static void applyStatus(int entityId,String posture,String mode,String state,String distance){
+        if(current==null || current.minecraft==null || current.minecraft.screen!=current || current.menu.getPetEntityId()!=entityId)return;
+        current.menu.updateStatus(posture,mode,state,distance);
+    }
     @Override protected void init(){super.init(); int x=(width-imageWidth)/2, y=(height-imageHeight)/2;
         addRenderableWidget(new Button(x+10,y+112,68,20,Component.literal("Livre"),b->PetBedNetwork.sendControl(menu.getPetEntityId(),0)));
         addRenderableWidget(new Button(x+86,y+112,68,20,Component.literal("Sentar"),b->PetBedNetwork.sendControl(menu.getPetEntityId(),1)));
@@ -26,5 +31,6 @@ public class PetControlScreen extends AbstractContainerScreen<PetControlMenu> {
         font.draw(p,Component.literal("Escolha o comportamento do pet:"),x+10,y+91,0xFF44372B);
     }
     @Override public void render(PoseStack p,int mx,int my,float partial){renderBackground(p);super.render(p,mx,my,partial);renderTooltip(p,mx,my);}
+    @Override public void onClose(){if(current==this)current=null;super.onClose();}
     @Override public boolean isPauseScreen(){return false;}
 }
