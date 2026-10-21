@@ -17,7 +17,7 @@ public final class PetLinkService {
 
     public static boolean link(Player player, ServerLevel level, PetBedBlockEntity bed, Mob pet) {
         if (!pet.isAlive() || !PetBedPets.isTamedPet(pet) || !player.getUUID().equals(PetBedPets.getOwnerId(pet))) return false;
-        if (!pet.level.dimension().equals(level.dimension()) || pet.distanceToSqr(player) > 64.0D || bed.getPetId() != null) return false;
+        if (!pet.level.dimension().equals(level.dimension()) || bed.getPetId() != null) return false;
         CompoundTag data = pet.getPersistentData();
         if (data.contains(DATA_KEY)) {
             CompoundTag old = data.getCompound(DATA_KEY);
@@ -28,17 +28,71 @@ public final class PetLinkService {
             if (oldEntity instanceof PetBedBlockEntity oldBed && pet.getUUID().equals(oldBed.getPetId())) return false;
             removeLinkMarker(pet); // stale marker left by a removed bed
         }
+        boolean wasOrderedToSit = PetBedPets.isOrderedToSit(pet);
+        PetBedMode initialMode = PetBedMode.FREE;
         bed.setLink(pet.getUUID(), player.getUUID());
+        bed.setMode(initialMode);
         CompoundTag marker = new CompoundTag();
         marker.putLong("Pos", bed.getBlockPos().asLong());
         marker.putString("Dimension", level.dimension().location().toString());
         marker.putUUID("Owner", player.getUUID());
-        boolean wasOrderedToSit = PetBedPets.isOrderedToSit(pet);
         marker.putBoolean(WAS_ORDERED_TO_SIT_KEY, wasOrderedToSit);
+        marker.putString("Mode", initialMode.id());
+        marker.putInt("AreaSize", bed.getAreaSize());
         data.put(DATA_KEY, marker);
-        // A tamed pet linked from a sitting pose must still be able to roam and return to bed.
-        if (wasOrderedToSit) PetBedPets.setOrderedToSit(pet, false);
+        // Release the Vanilla sit order while linked, but restore it from the snapshot on unlink.
+        PetBedPets.setOrderedToSit(pet, false);
         return true;
+    }
+
+    public static boolean setMode(Player player, ServerLevel level, Entity entity, PetBedMode mode) {
+        if (!(entity instanceof Mob pet) || mode == null || !isOwnedLinkedPet(player, level, pet)) return false;
+        CompoundTag marker = pet.getPersistentData().getCompound(DATA_KEY);
+        marker.putString("Mode", mode.id());
+        pet.getPersistentData().put(DATA_KEY, marker);
+        if (mode == PetBedMode.SIT) PetBedPets.setOrderedToSit(pet, true);
+        else PetBedPets.setOrderedToSit(pet, false);
+        BlockPos pos = BlockPos.of(marker.getLong("Pos"));
+        if (level.hasChunkAt(pos) && level.getBlockEntity(pos) instanceof PetBedBlockEntity bed && pet.getUUID().equals(bed.getPetId())) bed.setMode(mode);
+        pet.getNavigation().stop();
+        pet.getPersistentData().putBoolean("PetBedResting", false);
+        return true;
+    }
+
+    public static boolean setAreaSize(Player player, ServerLevel level, PetBedBlockEntity bed, int size) {
+        if (!PetBedArea.isValid(size) || bed.getPetId() == null || !player.getUUID().equals(bed.getOwnerId())) return false;
+        bed.setAreaSize(size);
+        Entity entity = level.getEntity(bed.getPetId());
+        if (entity != null && entity.getPersistentData().contains(DATA_KEY)) {
+            CompoundTag marker = entity.getPersistentData().getCompound(DATA_KEY);
+            if (marker.getLong("Pos") == bed.getBlockPos().asLong() && marker.getString("Dimension").equals(level.dimension().location().toString())) {
+                marker.putInt("AreaSize", size);
+                entity.getPersistentData().put(DATA_KEY, marker);
+            }
+        }
+        return true;
+    }
+
+    public static PetBedMode getMode(Entity entity) {
+        return entity.getPersistentData().contains(DATA_KEY) ? PetBedMode.fromId(entity.getPersistentData().getCompound(DATA_KEY).getString("Mode")) : PetBedMode.FREE;
+    }
+
+    public static int getAreaSize(Entity entity) {
+        if (!entity.getPersistentData().contains(DATA_KEY)) return PetBedArea.DEFAULT_SIZE;
+        int size = entity.getPersistentData().getCompound(DATA_KEY).getInt("AreaSize");
+        return PetBedArea.isValid(size) ? size : PetBedArea.DEFAULT_SIZE;
+    }
+
+    public static BlockPos getBedPos(Entity entity) {
+        return entity.getPersistentData().contains(DATA_KEY)
+                ? BlockPos.of(entity.getPersistentData().getCompound(DATA_KEY).getLong("Pos")) : entity.blockPosition();
+    }
+
+    private static boolean isOwnedLinkedPet(Player player, ServerLevel level, Mob pet) {
+        if (!pet.isAlive() || !PetBedPets.isTamedPet(pet) || !player.getUUID().equals(PetBedPets.getOwnerId(pet)) || pet.level != level || !hasLinkMarker(pet)) return false;
+        CompoundTag marker = pet.getPersistentData().getCompound(DATA_KEY);
+        BlockPos pos = BlockPos.of(marker.getLong("Pos"));
+        return isLinkValid(pet, level, pos);
     }
 
     public static boolean unlink(Player player, ServerLevel level, PetBedBlockEntity bed) {
@@ -76,7 +130,8 @@ public final class PetLinkService {
         CompoundTag marker = data.getCompound(DATA_KEY);
         boolean restoreSitting = marker.getBoolean(WAS_ORDERED_TO_SIT_KEY);
         data.remove(DATA_KEY);
-        if (restoreSitting && !PetBedPets.isOrderedToSit(entity)) PetBedPets.setOrderedToSit(entity, true);
+        // Restore the captured Vanilla sit order even if the linked mode changed it.
+        PetBedPets.setOrderedToSit(entity, restoreSitting);
     }
 
     public static boolean isLinkValid(Entity entity, ServerLevel level, BlockPos pos) {

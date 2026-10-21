@@ -2,12 +2,15 @@ package com.petrick.petbed.menu;
 
 import com.petrick.petbed.block.PetBedBlockEntity;
 import com.petrick.petbed.block.PetLinkService;
+import com.petrick.petbed.block.PetBedArea;
+import com.petrick.petbed.block.PetBedMode;
 import com.petrick.petbed.api.PetBedPets;
 import com.petrick.petbed.registry.ModMenus;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -25,12 +28,16 @@ public class PetBedMenu extends AbstractContainerMenu {
     private final BlockPos pos;
     private final List<Candidate> candidates;
     private String petName, species, state, distance;
+    private String posture, mode;
+    private int areaSize = PetBedArea.DEFAULT_SIZE;
     private UUID petId;
 
     public PetBedMenu(int id, Inventory inventory, FriendlyByteBuf buf) {
         this(id, inventory, buf.readBlockPos());
+        areaSize = readArea(buf.readVarInt());
+        mode = PetBedMode.fromId(buf.readUtf(32)).id();
         boolean linked = buf.readBoolean();
-        if (linked) { petId = buf.readUUID(); petName = buf.readUtf(128); species = buf.readUtf(128); state = buf.readUtf(64); distance = buf.readUtf(64); }
+        if (linked) { petId = buf.readUUID(); petName = buf.readUtf(128); species = buf.readUtf(128); state = buf.readUtf(64); distance = buf.readUtf(64); posture = buf.readUtf(32); mode = PetBedMode.fromId(buf.readUtf(32)).id(); }
         int count = buf.readVarInt();
         for (int i = 0; i < count; i++) candidates.add(new Candidate(buf.readUUID(), buf.readUtf(128), buf.readUtf(128)));
     }
@@ -40,10 +47,13 @@ public class PetBedMenu extends AbstractContainerMenu {
         this.pos = pos;
         this.candidates = new ArrayList<>();
         this.petName = "Nenhum"; this.species = "—"; this.state = "Livre"; this.distance = "—";
+        this.posture = "Em pé"; this.mode = PetBedMode.FREE.id();
     }
 
     public static void writeOpenData(FriendlyByteBuf buf, ServerPlayer player, PetBedBlockEntity bed) {
         buf.writeBlockPos(bed.getBlockPos());
+        buf.writeVarInt(bed.getAreaSize());
+        buf.writeUtf(bed.getMode().id(), 32);
         net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel) player.level;
         Mob pet = bed.getPetId() == null ? null : level.getEntity(bed.getPetId()) instanceof Mob m ? m : null;
         buf.writeBoolean(bed.getPetId() != null);
@@ -53,10 +63,15 @@ public class PetBedMenu extends AbstractContainerMenu {
             buf.writeUtf(pet == null ? "—" : pet.getType().getDescription().getString(), 128);
             buf.writeUtf(status(pet, level, bed.getBlockPos()), 64);
             buf.writeUtf(distance(pet, bed.getBlockPos()), 64);
+            buf.writeUtf(posture(pet), 32);
+            buf.writeUtf(PetLinkService.getMode(pet).id(), 32);
         }
-        List<Mob> eligible = level.getEntitiesOfClass(Mob.class,
-                new AABB(bed.getBlockPos()).inflate(8), candidate -> candidate.isAlive() && PetBedPets.isTamedPet(candidate)
-                        && player.getUUID().equals(PetBedPets.getOwnerId(candidate)) && candidate.getPersistentData().getCompound(PetLinkService.DATA_KEY).isEmpty());
+        List<Mob> eligible = new ArrayList<>();
+        for (Entity entity : level.getAllEntities()) {
+            if (entity instanceof Mob candidate && candidate.isAlive() && PetBedPets.isTamedPet(candidate)
+                    && player.getUUID().equals(PetBedPets.getOwnerId(candidate))
+                    && !candidate.getPersistentData().contains(PetLinkService.DATA_KEY)) eligible.add(candidate);
+        }
         buf.writeVarInt(eligible.size());
         for (Mob candidate : eligible) {
             buf.writeUUID(candidate.getUUID()); buf.writeUtf(candidate.getDisplayName().getString(), 128);
@@ -75,6 +90,9 @@ public class PetBedMenu extends AbstractContainerMenu {
         return pet == null || !pet.isAlive() ? "—" : String.format(java.util.Locale.ROOT, "%.1f blocos", Math.sqrt(pet.distanceToSqr(pos.getX()+.5, pos.getY(), pos.getZ()+.5)));
     }
 
+    public static String posture(@Nullable Mob pet) { return pet == null ? "Indisponível" : PetBedPets.isOrderedToSit(pet) ? "Sentado" : "Em pé"; }
+    private static int readArea(int size) { return PetBedArea.isValid(size) ? size : PetBedArea.DEFAULT_SIZE; }
+
     @Override public boolean stillValid(Player player) { return stillValid(ContainerLevelAccess.create(player.level, pos), player, com.petrick.petbed.registry.ModBlocks.PET_BED.get()); }
     public BlockPos getPos() { return pos; }
     public List<Candidate> getCandidates() { return candidates; }
@@ -84,7 +102,13 @@ public class PetBedMenu extends AbstractContainerMenu {
     public String getSpecies() { return species; }
     public String getState() { return state; }
     public String getDistance() { return distance; }
-    public void updateStatus(@Nullable UUID id, String name, String kind, String status, String range) { petId = id; petName = name; species = kind; state = status; distance = range; }
+    public String getPosture() { return posture; }
+    public String getMode() { return mode; }
+    public int getAreaSize() { return areaSize; }
+    public void updateStatus(@Nullable UUID id, String name, String kind, String status, String range, String currentPosture, String currentMode, int size) {
+        petId = id; petName = name; species = kind; state = status; distance = range; posture = currentPosture;
+        mode = PetBedMode.fromId(currentMode).id(); areaSize = readArea(size);
+    }
     @Override public boolean canTakeItemForPickAll(net.minecraft.world.item.ItemStack stack, net.minecraft.world.inventory.Slot slot) { return false; }
     @Override public net.minecraft.world.item.ItemStack quickMoveStack(Player player, int index) { return net.minecraft.world.item.ItemStack.EMPTY; }
 

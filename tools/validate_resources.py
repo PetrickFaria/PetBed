@@ -31,16 +31,21 @@ if 'modId="${mod_id}"' not in mod_toml or 'versionRange="[1.19.2,1.20)"' not in 
     raise SystemExit("mods.toml is missing PetBed's expanded mod ID or target Minecraft range")
 
 blockstate = json.loads((RES / "assets/petbed/blockstates/pet_bed.json").read_text())
-model_id = blockstate["variants"][""]["model"]
-model_path = RES / "assets" / model_id.split(":")[0] / "models" / (model_id.split(":")[1] + ".json")
-model = json.loads(model_path.read_text())
-for value in model.get("textures", {}).values():
-    if value.startswith("#"):
-        continue
-    ns, texture = value.split(":", 1)
-    texture_path = RES / "assets" / ns / "textures" / (texture + ".png")
-    if not texture_path.is_file():
-        raise SystemExit(f"Model texture not found: {texture_path.relative_to(ROOT)}")
+variants = blockstate.get("variants", {})
+expected_facing = {f"facing={direction}" for direction in ("north", "south", "east", "west")}
+if set(variants) != expected_facing:
+    raise SystemExit("PetBed blockstate must define all four facing variants")
+for variant in variants.values():
+    model_id = variant["model"]
+    model_path = RES / "assets" / model_id.split(":")[0] / "models" / (model_id.split(":")[1] + ".json")
+    model = json.loads(model_path.read_text())
+    for value in model.get("textures", {}).values():
+        if value.startswith("#"):
+            continue
+        ns, texture = value.split(":", 1)
+        texture_path = RES / "assets" / ns / "textures" / (texture + ".png")
+        if not texture_path.is_file():
+            raise SystemExit(f"Model texture not found: {texture_path.relative_to(ROOT)}")
 
 for path in required:
     if path.suffix == ".png":
@@ -68,4 +73,21 @@ for method in ("canUse", "canContinueToUse", "tick"):
 if "setNoAi" in follow_source:
     raise SystemExit("The linked-pet guard must not disable the animal's full AI")
 
-print("PetBed resource and follow-guard checks passed (JSON, model texture paths, PNGs, recipe, mixin config/source).")
+area_source = (ROOT / "src/main/java/com/petrick/petbed/block/PetBedArea.java").read_text(encoding="utf-8")
+for size in ("15", "30", "45", "50", "75"):
+    if size not in area_source:
+        raise SystemExit(f"Movement area option {size} is missing")
+if "DEFAULT_SIZE = 50" not in area_source:
+    raise SystemExit("New beds must use a valid 50×50 default area")
+network_source = (ROOT / "src/main/java/com/petrick/petbed/network/PetBedNetwork.java").read_text(encoding="utf-8")
+for marker in ("ControlMessage", "setAreaSize", "setMode"):
+    if marker not in network_source:
+        raise SystemExit(f"Server validated network operation {marker} is missing")
+for path in (ROOT / "src/main/java/com/petrick/petbed/client/PetControlScreen.java", ROOT / "src/main/java/com/petrick/petbed/menu/PetControlMenu.java"):
+    if not path.is_file():
+        raise SystemExit(f"Pet control interface source missing: {path.name}")
+link_source = (ROOT / "src/main/java/com/petrick/petbed/block/PetLinkService.java").read_text(encoding="utf-8")
+if "PetBedPets.setOrderedToSit(pet, false)" not in link_source or "PetBedPets.setOrderedToSit(entity, restoreSitting)" not in link_source:
+    raise SystemExit("Linking must release sit while linked and restore the original sit order on unlink")
+
+print("PetBed static checks passed (resources, four facings, recipe, mixin guard, area choices, mode controls).")

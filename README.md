@@ -6,11 +6,12 @@ The first block, `petbed:pet_bed` (Portuguese display name: **Caminha dos Pets**
 
 ## Pet linking and behavior
 
-- Right-click opens a server-validated management screen. It lists nearby (8-block radius), loaded pets owned by the player and lets the player link or unlink one.
+- Right-click opens a server-validated management screen. It lists the player's loaded eligible pets in the same dimension, regardless of distance; unavailable/unloaded pets are not force-loaded.
 - One pet may be linked to only one bed. The block entity stores the pet UUID and owner UUID; the pet's Forge persistent data stores the bed position and dimension. Linking requires the pet's ownership adapter to identify the player as its owner.
 - Vanilla `TamableAnimal` species are supported, including tamed wolves, cats and parrots. Support for another mod's `Mob` ownership system can be registered with `PetBedPets.register(...)` and `PetOwnershipAdapter` during mod initialization. Non-Mob entities and systems without an adapter are intentionally ineligible.
 - While the pet has a valid bed link, a conditional Mixin pauses only Vanilla's `FollowOwnerGoal` (`canUse`, continuation and tick); the goal is not removed or duplicated. This prevents the owner's follow path and its built-in teleport from running. Removing the link removes the guard immediately, so the same Vanilla goal resumes without reconstructing the entity or its AI.
-- The pet keeps its other species goals. During the day it explores using its natural goals; the PetBed return goal takes movement priority at 90 blocks, leaving a margin before the 100-block limit. If the route cannot be found, the goal retries after 100 ticks rather than teleporting or loading chunks. At night it walks back using ordinary navigation and rests at the cushion. Only the original sit order is temporarily cleared on linking and restored on unlink; this does not disable AI.
+- The pet keeps its other species goals. Each bed stores a square movement area of 15×15, 30×30, 45×45, 50×50, or 75×75 blocks (new beds default to 50×50). Right-click an owned linked pet for **Livre**, **Sentar**, and **Seguir** modes. Daytime movement and return use normal navigation; at night the pet walks to the bed and resumes its chosen mode at dawn. Failed routes retry after 100 ticks without teleporting or loading chunks.
+- Unlinking restores the pet's captured Vanilla sit order, then its original Vanilla follow goal resumes. No entity recreation or full AI disable is used.
 - This initial version uses the animal's idle pose while resting; it does not add species-specific sleep animations. A bed that is unloaded can delay return until its chunk is already loaded through normal world activity. Unreachable paths are retried with a 100-tick cooldown.
 - Data is server-authoritative and saved with the block entity and pet entity. No world-wide entity scan runs each tick.
 
@@ -28,19 +29,19 @@ The JAR is written to `build/libs/PetBed-0.1.0.jar`. `.github/workflows/build.ym
 
 `python3 tools/validate_resources.py` checks JSON syntax, required files, model texture references, 16x16 PNG signatures, the recipe, and the follow-guard configuration/source. The workflow also compiles the Forge mod and checks that the guard is packaged in the JAR. These checks do not prove runtime behavior.
 
-See [`docs/manual-test-matrix.md`](docs/manual-test-matrix.md) for the fifteen requested gameplay scenarios and the additional cases still awaiting an in-game run.
+See [`docs/manual-test-matrix.md`](docs/manual-test-matrix.md) for the thirty requested gameplay scenarios and additional cases still awaiting an in-game run.
 
 | Scenario | Status |
 | --- | --- |
 | Guard source/config and resources, recipe, texture/model paths | Automated static checks |
 | Mixin compilation and guard files in built JAR | GitHub Actions build checks |
-| Link wolf/cat/parrot, owner travel, no follow/teleport, autonomous roaming, 100-block boundary | Manual in-game validation pending |
-| Night return/rest, dawn wake, sitting before link and restoration after unlink | Manual in-game validation pending |
-| Unlink restores Vanilla follow and teleport | Manual in-game validation pending |
+| Link wolf/cat/parrot, owner travel, no follow/teleport, autonomous roaming, five square-area boundaries | Manual in-game validation pending |
+| Three modes, owner-only controls, night-return priority, dawn mode restoration, bed centering/orientation | Manual in-game validation pending |
+| Unlink restores Vanilla follow/teleport and original sit order | Manual in-game validation pending |
 | Save/reload, chunk unload/reload, server restart, dimension change, bed break, pet death | Manual single-player and dedicated-server validation pending |
 | Other players' pets rejected; duplicate links and unrelated untamed animals unchanged | Manual multiplayer validation pending |
 
-The Forge compilation and all gameplay scenarios still require validation. No in-game tests are represented as passed.
+The local environment has no Gradle executable or wrapper. Forge compilation will be checked by GitHub Actions; all gameplay scenarios still require validation in-game. No gameplay tests are represented as passed.
 
 ## Known limitations
 

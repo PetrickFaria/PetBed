@@ -1,1 +1,1 @@
-{"variants":{"":{"model":"petbed:block/pet_bed"}}}
+{"variants":{"facing=north":{"model":"petbed:block/pet_bed","y":0},"facing=east":{"model":"petbed:block/pet_bed","y":90},"facing=south":{"model":"petbed:block/pet_bed","y":180},"facing=west":{"model":"petbed:block/pet_bed","y":270}}}

@@ -1,6 +1,9 @@
 package com.petrick.petbed;
 
 import com.petrick.petbed.block.PetBedBlockEntity;
+import com.petrick.petbed.block.PetBedBlock;
+import com.petrick.petbed.block.PetBedArea;
+import com.petrick.petbed.block.PetBedMode;
 import com.petrick.petbed.block.PetLinkService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -23,21 +26,21 @@ public final class PetRestGoal extends Goal {
     }
 
     @Override public boolean canUse() {
-        if (!(pet.level instanceof ServerLevel level) || !pet.isAlive() || !PetBedPets.isTamedPet(pet) || PetBedPets.isOrderedToSit(pet)) return false;
+        if (!(pet.level instanceof ServerLevel level) || !pet.isAlive() || !PetBedPets.isTamedPet(pet)) return false;
         if (retryDelay > 0) { retryDelay--; return false; }
         bedPos = readBedPos(level);
         if (bedPos == null) return false;
-        long time = level.getDayTime() % 24000L;
-        boolean night = time >= 13000L && time < 23000L;
-        return night || pet.distanceToSqr(bedPos.getX() + .5, bedPos.getY(), bedPos.getZ() + .5) >= 90.0D * 90.0D;
+        boolean night = isNight(level);
+        if (night && PetLinkService.getMode(pet) == PetBedMode.SIT && PetBedPets.isOrderedToSit(pet)) PetBedPets.setOrderedToSit(pet, false);
+        if (!night && PetLinkService.getMode(pet) == PetBedMode.SIT) return false;
+        return night || !insideArea();
     }
 
     @Override public boolean canContinueToUse() {
-        if (!(pet.level instanceof ServerLevel level) || !pet.isAlive() || PetBedPets.isOrderedToSit(pet) || bedPos == null) return false;
+        if (!(pet.level instanceof ServerLevel level) || !pet.isAlive() || bedPos == null) return false;
         if (!PetLinkService.isLinkValid(pet, level, bedPos)) return false;
-        long time = level.getDayTime() % 24000L;
-        boolean night = time >= 13000L && time < 23000L;
-        return night || (!arrived && pet.distanceToSqr(bedPos.getX() + .5, bedPos.getY(), bedPos.getZ() + .5) >= 80.0D * 80.0D);
+        boolean night = isNight(level);
+        return night || (PetLinkService.getMode(pet) != PetBedMode.SIT && !insideArea());
     }
 
     @Override public void start() {
@@ -48,11 +51,12 @@ public final class PetRestGoal extends Goal {
     @Override public void tick() {
         if (!(pet.level instanceof ServerLevel level) || bedPos == null) return;
         if (retryDelay > 0) { retryDelay--; return; }
-        boolean night = level.getDayTime() % 24000L >= 13000L && level.getDayTime() % 24000L < 23000L;
+        boolean night = isNight(level);
+        if (night && PetLinkService.getMode(pet) == PetBedMode.SIT && !atBed() && PetBedPets.isOrderedToSit(pet)) PetBedPets.setOrderedToSit(pet, false);
         if (atBed()) { rest(); return; }
         pet.getPersistentData().putBoolean("PetBedResting", false);
         if (pet.getNavigation().isDone()) {
-            if (night || pet.distanceToSqr(bedPos.getX() + .5, bedPos.getY(), bedPos.getZ() + .5) >= 90.0D * 90.0D) {
+            if (night || !insideArea()) {
                 if (!navigate()) retryDelay = 100;
             }
         }
@@ -68,25 +72,33 @@ public final class PetRestGoal extends Goal {
     private boolean navigate() {
         if (!(pet.level instanceof ServerLevel level) || bedPos == null || !level.hasChunkAt(bedPos) || !PetLinkService.isLinkValid(pet, level, bedPos)) return false;
         // Speed modifier 1.0 uses the species' normal walking pace.
-        return pet.getNavigation().moveTo(bedPos.getX() + .5, bedPos.getY() + 5.0 / 16.0, bedPos.getZ() + .5, 1.0);
+        return pet.getNavigation().moveTo(bedPos.getX() + .5, bedPos.getY() + 4.0 / 16.0, bedPos.getZ() + .5, 1.0);
     }
 
     private boolean atBed() {
         if (bedPos == null) return false;
         double dx = pet.getX() - (bedPos.getX() + .5), dz = pet.getZ() - (bedPos.getZ() + .5);
-        return dx * dx + dz * dz < .42 && Math.abs(pet.getY() - (bedPos.getY() + 5.0 / 16.0)) < 1.1;
+        return dx * dx + dz * dz < .42 && Math.abs(pet.getY() - (bedPos.getY() + 4.0 / 16.0)) < 1.1;
     }
 
     private void rest() {
         if (!arrived) {
             pet.getNavigation().stop();
-            // One arrival alignment prevents visible edge clipping; no recurring position correction.
-            pet.setPos(bedPos.getX() + .5, bedPos.getY() + 5.0 / 16.0, bedPos.getZ() + .5);
+            // One arrival alignment and facing adjustment; no recurring position correction.
+            pet.setPos(bedPos.getX() + .5, bedPos.getY() + 4.0 / 16.0, bedPos.getZ() + .5);
+            if (pet.level.getBlockState(bedPos).hasProperty(PetBedBlock.FACING)) {
+                float yaw = pet.level.getBlockState(bedPos).getValue(PetBedBlock.FACING).toYRot();
+                pet.setYRot(yaw); pet.yRotO = yaw; pet.yHeadRot = yaw; pet.yBodyRot = yaw;
+            }
             arrived = true;
         }
         pet.setDeltaMovement(0, 0, 0);
         pet.getPersistentData().putBoolean("PetBedResting", true);
+        if (PetLinkService.getMode(pet) == PetBedMode.SIT) PetBedPets.setOrderedToSit(pet, true);
     }
+
+    private boolean insideArea() { return bedPos != null && PetBedArea.contains(bedPos, pet.getX(), pet.getZ(), PetLinkService.getAreaSize(pet)); }
+    private static boolean isNight(ServerLevel level) { long time = level.getDayTime() % 24000L; return time >= 13000L && time < 23000L; }
 
     private BlockPos readBedPos(ServerLevel level) {
         CompoundTag data = pet.getPersistentData();

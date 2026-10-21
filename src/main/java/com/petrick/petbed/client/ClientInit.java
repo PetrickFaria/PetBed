@@ -7,5 +7,5 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
 public final class ClientInit {
     private ClientInit() {}
-    public static void onClientSetup(FMLClientSetupEvent event) { event.enqueueWork(() -> MenuScreens.register(ModMenus.PET_BED.get(), PetBedScreen::new)); }
+    public static void onClientSetup(FMLClientSetupEvent event) { event.enqueueWork(() -> { MenuScreens.register(ModMenus.PET_BED.get(), PetBedScreen::new); MenuScreens.register(ModMenus.PET_CONTROL.get(), PetControlScreen::new); }); }
 }

@@ -15,6 +15,9 @@ with zipfile.ZipFile(jar) as archive:
         "petbed.refmap.json",
         "com/petrick/petbed/mixin/FollowOwnerGoalMixin.class",
         "com/petrick/petbed/block/PetLinkService.class",
+        "com/petrick/petbed/block/PetBedArea.class",
+        "com/petrick/petbed/menu/PetControlMenu.class",
+        "com/petrick/petbed/client/PetControlScreen.class",
     }
     missing = sorted(required - names)
     if missing:
