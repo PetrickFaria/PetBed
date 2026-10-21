@@ -2,6 +2,7 @@ plugins {
     id 'eclipse'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '5.1.77'
+    id 'org.spongepowered.mixin' version '0.7.38'
 }
 
 version = mod_version
@@ -18,8 +19,20 @@ minecraft {
     }
 }
 
-repositories { maven { url = 'https://maven.minecraftforge.net/' } }
-dependencies { minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}" }
+repositories {
+    maven { url = 'https://maven.minecraftforge.net/' }
+    mavenCentral()
+}
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    compileOnly 'org.spongepowered:mixin:0.8.5'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+}
+
+mixin {
+    add sourceSets.main, 'petbed.refmap.json'
+    config 'petbed.mixins.json'
+}
 
 tasks.named('processResources', ProcessResources).configure {
     var replaceProperties = [mod_id: mod_id, mod_name: 'PetBed', mod_version: mod_version, minecraft_version: minecraft_version, forge_version: forge_version]
@@ -28,3 +41,7 @@ tasks.named('processResources', ProcessResources).configure {
 }
 
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.release = 17 }
+
+tasks.named('jar', Jar).configure {
+    manifest.attributes(['MixinConfigs': 'petbed.mixins.json'])
+}

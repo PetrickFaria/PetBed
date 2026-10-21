@@ -12,6 +12,7 @@ import java.util.UUID;
 
 public final class PetLinkService {
     public static final String DATA_KEY = "PetBedLink";
+    private static final String WAS_ORDERED_TO_SIT_KEY = "WasOrderedToSit";
     private PetLinkService() {}
 
     public static boolean link(Player player, ServerLevel level, PetBedBlockEntity bed, Mob pet) {
@@ -25,14 +26,18 @@ public final class PetLinkService {
             if (!level.hasChunkAt(oldPos)) return false;
             BlockEntity oldEntity = level.getBlockEntity(oldPos);
             if (oldEntity instanceof PetBedBlockEntity oldBed && pet.getUUID().equals(oldBed.getPetId())) return false;
-            data.remove(DATA_KEY); // stale marker left by a removed bed
+            removeLinkMarker(pet); // stale marker left by a removed bed
         }
         bed.setLink(pet.getUUID(), player.getUUID());
         CompoundTag marker = new CompoundTag();
         marker.putLong("Pos", bed.getBlockPos().asLong());
         marker.putString("Dimension", level.dimension().location().toString());
         marker.putUUID("Owner", player.getUUID());
+        boolean wasOrderedToSit = PetBedPets.isOrderedToSit(pet);
+        marker.putBoolean(WAS_ORDERED_TO_SIT_KEY, wasOrderedToSit);
         data.put(DATA_KEY, marker);
+        // A tamed pet linked from a sitting pose must still be able to roam and return to bed.
+        if (wasOrderedToSit) PetBedPets.setOrderedToSit(pet, false);
         return true;
     }
 
@@ -42,7 +47,7 @@ public final class PetLinkService {
         boolean originalOwner = bed.getOwnerId() != null && bed.getOwnerId().equals(player.getUUID());
         boolean currentPetOwner = entity != null && player.getUUID().equals(PetBedPets.getOwnerId(entity));
         if (entity == null ? !originalOwner : !currentPetOwner) return false;
-        if (entity != null) entity.getPersistentData().remove(DATA_KEY);
+        if (entity != null) removeLinkMarker(entity);
         bed.setLink(null, null);
         return true;
     }
@@ -51,7 +56,27 @@ public final class PetLinkService {
         CompoundTag data = entity.getPersistentData();
         if (!data.contains(DATA_KEY)) return;
         CompoundTag marker = data.getCompound(DATA_KEY);
-        if (marker.getLong("Pos") == pos.asLong() && marker.getString("Dimension").equals(level.dimension().location().toString())) data.remove(DATA_KEY);
+        if (marker.getLong("Pos") == pos.asLong() && marker.getString("Dimension").equals(level.dimension().location().toString())) removeLinkMarker(entity);
+    }
+
+    /** Lightweight per-pet guard: block/chunk resolution stays in the return goal, not this tick hook. */
+    public static boolean hasLinkMarker(Entity entity) {
+        CompoundTag data = entity.getPersistentData();
+        if (!data.contains(DATA_KEY) || !PetBedPets.isTamedPet(entity)) return false;
+        CompoundTag marker = data.getCompound(DATA_KEY);
+        if (marker.hasUUID("Owner") && !marker.getUUID("Owner").equals(PetBedPets.getOwnerId(entity))) return false;
+        if (!(entity.level instanceof ServerLevel level) || !marker.getString("Dimension").equals(level.dimension().location().toString())) return false;
+        return true;
+    }
+
+    /** Remove a link and restore the original sit order once, without replacing the entity or its AI. */
+    public static void removeLinkMarker(Entity entity) {
+        CompoundTag data = entity.getPersistentData();
+        if (!data.contains(DATA_KEY)) return;
+        CompoundTag marker = data.getCompound(DATA_KEY);
+        boolean restoreSitting = marker.getBoolean(WAS_ORDERED_TO_SIT_KEY);
+        data.remove(DATA_KEY);
+        if (restoreSitting && !PetBedPets.isOrderedToSit(entity)) PetBedPets.setOrderedToSit(entity, true);
     }
 
     public static boolean isLinkValid(Entity entity, ServerLevel level, BlockPos pos) {

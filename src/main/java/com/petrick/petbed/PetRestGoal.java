@@ -42,11 +42,12 @@ public final class PetRestGoal extends Goal {
 
     @Override public void start() {
         arrived = false;
-        if (atBed()) rest(); else navigate();
+        if (atBed()) rest(); else if (!navigate()) retryDelay = 100;
     }
 
     @Override public void tick() {
         if (!(pet.level instanceof ServerLevel level) || bedPos == null) return;
+        if (retryDelay > 0) { retryDelay--; return; }
         boolean night = level.getDayTime() % 24000L >= 13000L && level.getDayTime() % 24000L < 23000L;
         if (atBed()) { rest(); return; }
         pet.getPersistentData().putBoolean("PetBedResting", false);
@@ -94,16 +95,16 @@ public final class PetRestGoal extends Goal {
         if (marker.hasUUID("Owner") && !marker.getUUID("Owner").equals(PetBedPets.getOwnerId(pet))) {
             BlockPos oldPos = BlockPos.of(marker.getLong("Pos"));
             if (level.hasChunkAt(oldPos) && level.getBlockEntity(oldPos) instanceof PetBedBlockEntity oldBed && pet.getUUID().equals(oldBed.getPetId())) oldBed.setLink(null, null);
-            data.remove(PetLinkService.DATA_KEY);
+            PetLinkService.removeLinkMarker(pet);
             return null;
         }
         if (!marker.getString("Dimension").equals(level.dimension().location().toString())) {
-            data.remove(PetLinkService.DATA_KEY);
+            PetLinkService.removeLinkMarker(pet);
             return null;
         }
         BlockPos pos = BlockPos.of(marker.getLong("Pos"));
         if (level.hasChunkAt(pos) && !PetLinkService.isLinkValid(pet, level, pos)) {
-            data.remove(PetLinkService.DATA_KEY);
+            PetLinkService.removeLinkMarker(pet);
             return null;
         }
         return pos;

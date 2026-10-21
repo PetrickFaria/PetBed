@@ -27,6 +27,7 @@ public final class PetBehaviorEvents {
                 && level.getBlockEntity(pos) instanceof PetBedBlockEntity bed && entity.getUUID().equals(bed.getPetId())) {
             bed.setLink(null, null);
         }
+        // Death ends the relationship; do not restore a sit command on an entity being removed.
         entity.getPersistentData().remove(PetLinkService.DATA_KEY);
     }
 }

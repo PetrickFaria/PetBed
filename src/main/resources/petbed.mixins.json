@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.petrick.petbed.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "petbed.refmap.json",
+  "mixins": [
+    "FollowOwnerGoalMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

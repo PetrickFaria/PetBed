@@ -9,4 +9,6 @@ public interface PetOwnershipAdapter<T extends Mob> {
     UUID getOwnerId(T pet);
     /** Preserve an owner's explicit sit command when the pet type exposes one. */
     default boolean isOrderedToSit(T pet) { return false; }
+    /** Temporarily release a pet's sit order while it is linked; default is a no-op for integrations without sit support. */
+    default void setOrderedToSit(T pet, boolean sitting) { }
 }

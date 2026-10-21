@@ -15,6 +15,7 @@ public final class PetBedPets {
             @Override public boolean isTamed(TamableAnimal pet) { return pet.isTame(); }
             @Override public UUID getOwnerId(TamableAnimal pet) { return pet.getOwnerUUID(); }
             @Override public boolean isOrderedToSit(TamableAnimal pet) { return pet.isOrderedToSit(); }
+            @Override public void setOrderedToSit(TamableAnimal pet, boolean sitting) { pet.setOrderedToSit(sitting); }
         });
     }
     private PetBedPets() {}
@@ -33,4 +34,5 @@ public final class PetBedPets {
     public static boolean isTamedPet(Entity entity) { PetOwnershipAdapter<Mob> a=adapter(entity); return a!=null && a.isTamed((Mob)entity) && a.getOwnerId((Mob)entity)!=null; }
     public static UUID getOwnerId(Entity entity) { PetOwnershipAdapter<Mob> a=adapter(entity); return a==null?null:a.getOwnerId((Mob)entity); }
     public static boolean isOrderedToSit(Entity entity) { PetOwnershipAdapter<Mob> a=adapter(entity); return a!=null && a.isOrderedToSit((Mob)entity); }
+    public static void setOrderedToSit(Entity entity, boolean sitting) { PetOwnershipAdapter<Mob> a=adapter(entity); if (a!=null) a.setOrderedToSit((Mob)entity, sitting); }
 }

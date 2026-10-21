@@ -20,6 +20,7 @@ required = [
     RES / "assets/petbed/textures/block/pad.png",
     RES / "data/petbed/recipes/pet_bed.json",
     RES / "data/petbed/loot_tables/blocks/pet_bed.json",
+    RES / "petbed.mixins.json",
 ]
 missing = [str(p.relative_to(ROOT)) for p in required if not p.is_file()]
 if missing:
@@ -54,4 +55,17 @@ recipe = json.loads((RES / "data/petbed/recipes/pet_bed.json").read_text())
 if recipe.get("result", {}).get("item") != "petbed:pet_bed":
     raise SystemExit("PetBed crafting recipe does not produce petbed:pet_bed")
 
-print("PetBed resource checks passed (JSON, registrations metadata, model texture paths, PNGs, recipe).")
+mixin_config = json.loads((RES / "petbed.mixins.json").read_text())
+if "com.petrick.petbed.mixin" != mixin_config.get("package") or "FollowOwnerGoalMixin" not in mixin_config.get("mixins", []):
+    raise SystemExit("Mixin config does not register the linked-pet follow guard")
+follow_mixin = ROOT / "src/main/java/com/petrick/petbed/mixin/FollowOwnerGoalMixin.java"
+if not follow_mixin.is_file():
+    raise SystemExit("FollowOwnerGoalMixin source is missing")
+follow_source = follow_mixin.read_text(encoding="utf-8")
+for method in ("canUse", "canContinueToUse", "tick"):
+    if f'method = "{method}"' not in follow_source:
+        raise SystemExit(f"FollowOwnerGoalMixin is missing its {method} guard")
+if "setNoAi" in follow_source:
+    raise SystemExit("The linked-pet guard must not disable the animal's full AI")
+
+print("PetBed resource and follow-guard checks passed (JSON, model texture paths, PNGs, recipe, mixin config/source).")
