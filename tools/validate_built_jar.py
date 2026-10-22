@@ -14,6 +14,8 @@ with zipfile.ZipFile(jar) as archive:
         "petbed.mixins.json",
         "petbed.refmap.json",
         "com/petrick/petbed/mixin/FollowOwnerGoalMixin.class",
+        "com/petrick/petbed/mixin/RestingPetCollisionMixin.class",
+        "com/petrick/petbed/PetRestGoal.class",
         "com/petrick/petbed/block/PetLinkService.class",
         "com/petrick/petbed/block/PetBedArea.class",
         "com/petrick/petbed/menu/PetControlMenu.class",

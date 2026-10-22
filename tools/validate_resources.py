@@ -61,8 +61,8 @@ if recipe.get("result", {}).get("item") != "petbed:pet_bed":
     raise SystemExit("PetBed crafting recipe does not produce petbed:pet_bed")
 
 mixin_config = json.loads((RES / "petbed.mixins.json").read_text())
-if "com.petrick.petbed.mixin" != mixin_config.get("package") or "FollowOwnerGoalMixin" not in mixin_config.get("mixins", []):
-    raise SystemExit("Mixin config does not register the linked-pet follow guard")
+if "com.petrick.petbed.mixin" != mixin_config.get("package") or not {"FollowOwnerGoalMixin", "RestingPetCollisionMixin"}.issubset(set(mixin_config.get("mixins", []))):
+    raise SystemExit("Mixin config does not register the linked-pet follow and resting collision guards")
 follow_mixin = ROOT / "src/main/java/com/petrick/petbed/mixin/FollowOwnerGoalMixin.java"
 if not follow_mixin.is_file():
     raise SystemExit("FollowOwnerGoalMixin source is missing")
@@ -72,6 +72,20 @@ for method in ("canUse", "canContinueToUse", "tick"):
         raise SystemExit(f"FollowOwnerGoalMixin is missing its {method} guard")
 if "setNoAi" in follow_source:
     raise SystemExit("The linked-pet guard must not disable the animal's full AI")
+
+rest_goal = ROOT / "src/main/java/com/petrick/petbed/PetRestGoal.java"
+collision_mixin = ROOT / "src/main/java/com/petrick/petbed/mixin/RestingPetCollisionMixin.java"
+if not rest_goal.is_file() or not collision_mixin.is_file():
+    raise SystemExit("Pet rest pathfinding or temporary collision guard source is missing")
+rest_source = rest_goal.read_text(encoding="utf-8")
+for marker in ("createPath(candidate, 0)", "path.canReach()", "moveTo(candidate.path(), 1.0D)", "atApproach()", "STUCK_AFTER_TICKS", "RESTING_KEY"):
+    if marker not in rest_source:
+        raise SystemExit(f"Pet rest behavior is missing required path/stability check: {marker}")
+if "noPhysics" in rest_source or "teleportTo" in rest_source:
+    raise SystemExit("Pet return/rest logic must retain block collision and avoid teleporting")
+collision_source = collision_mixin.read_text(encoding="utf-8")
+if 'method = "isPushable"' not in collision_source or "isRestingLinkedPet" not in collision_source:
+    raise SystemExit("Entity collision guard must be conditional on linked-pet rest state")
 
 area_source = (ROOT / "src/main/java/com/petrick/petbed/block/PetBedArea.java").read_text(encoding="utf-8")
 for size in ("15", "30", "45", "50", "75"):

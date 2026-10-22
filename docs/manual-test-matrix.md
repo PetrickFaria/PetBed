@@ -38,3 +38,32 @@ CI validates source/resource structure, Java compilation and that the built JAR 
 | 30 | Restart dedicated server and verify multiplayer controls and persistence | Manual pending |
 
 Also manually verify owner disconnect/reconnect and dimension travel, chunk unload/reload, bed destruction, pet death, ownership/duplicate rejection, prior sit state restoration, multiple players/beds, and normal behavior for unlinked animals. Dedicated-server launch should be checked to catch client-only class loading.
+
+## Regression checks: bed rest and obstacle navigation
+
+These cases need an in-game Forge world; the source checks and build do not simulate entity physics or terrain pathfinding.
+
+| # | Scenario | Status |
+| --- | --- | --- |
+| R1 | Approach the bed from its front | Manual pending |
+| R2 | Approach the bed from behind | Manual pending |
+| R3 | Approach the bed from each side | Manual pending |
+| R4 | Rest with bed facing north | Manual pending |
+| R5 | Rest with bed facing south | Manual pending |
+| R6 | Rest with bed facing east | Manual pending |
+| R7 | Rest with bed facing west | Manual pending |
+| R8 | Player attempts to push a sleeping pet | Manual pending |
+| R9 | Another mob attempts to push a sleeping pet | Manual pending |
+| R10 | Observe center position and orientation over several in-game minutes | Manual pending |
+| R11 | Change mode/unlink and confirm movement and entity collision return | Manual pending |
+| R12 | Save/reload while resting and confirm position, heading, and push protection | Manual pending |
+| R13 | Return with an unobstructed route | Manual pending |
+| R14 | Return with a solid obstacle between pet and bed | Manual pending |
+| R15 | Route around a wall with a lateral opening | Manual pending |
+| R16 | Reach a bed behind an open doorway | Manual pending |
+| R17 | Change the route obstacle while the pet is walking | Manual pending |
+| R18 | Temporarily block the current path and confirm a controlled recalculation | Manual pending |
+| R19 | Make the bed unreachable; confirm retries are spaced and AI remains responsive | Manual pending |
+| R20 | Confirm final alignment occurs only after reaching an adjacent path waypoint | Manual pending |
+| R21 | Confirm night return works with each configured movement area | Manual pending |
+| R22 | Confirm no return-path teleport occurs | Manual pending |
