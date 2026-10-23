@@ -37,7 +37,7 @@ public final class PetBehaviorEvents {
     }
     @SubscribeEvent public void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide || !(event.getEntity() instanceof Mob pet) || !PetBedPets.supports(pet)) return;
-        if (!hasGoal(pet, PetRestGoal.class)) pet.goalSelector.addGoal(1, new PetRestGoal(pet));
+        if (!hasGoal(pet, PetRestGoal.class)) pet.goalSelector.addGoal(0, new PetRestGoal(pet));
         if (!hasGoal(pet, PetFollowGoal.class)) pet.goalSelector.addGoal(2, new PetFollowGoal(pet));
     }
 
