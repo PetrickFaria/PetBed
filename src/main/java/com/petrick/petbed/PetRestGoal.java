@@ -10,6 +10,8 @@ import com.petrick.petbed.block.PetLinkService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.pathfinder.Path;
@@ -37,6 +39,7 @@ public final class PetRestGoal extends Goal {
     private int stalledTicks;
     private int failedAttempts;
     private long lastFailureLogTime = -6000L;
+    private long lastAccommodationLogTime = -1200L;
     private int stuckReplans;
     private Vec3 lastProgressPosition = Vec3.ZERO;
     private float bedYaw;
@@ -111,8 +114,7 @@ public final class PetRestGoal extends Goal {
             rest();
             return;
         }
-        // A one-block final alignment is valid only from the adjacent, same-level approach cell.
-        // The path to this cell is still followed using the species' normal PathNavigation.
+        // A short, collision-checked final alignment is attempted before retrying the normal navigation path.
         if ((night || !insideArea()) && canAlignFromCurrentPosition()) {
             rest();
             return;
@@ -228,28 +230,69 @@ public final class PetRestGoal extends Goal {
         return dx * dx + dz * dz <= 1.21D && Math.abs(pet.getY() - approachPos.getY()) <= 1.0D;
     }
 
-    /** Final alignment is allowed only from a genuinely reached nearby waypoint and a clear destination. */
+    /**
+     * Allows one short final placement only when the pet is physically close, on the bed's floor level,
+     * and the complete swept body box is clear. The bed's own shape is ignored because it is the target.
+     */
     private boolean canAlignFromCurrentPosition() {
         if (!(pet.level instanceof ServerLevel level) || bedPos == null || !level.hasChunkAt(bedPos)) return false;
         if (onRestSurface()) return true;
+
         double centerX = bedPos.getX() + .5D, centerZ = bedPos.getZ() + .5D;
         double surfaceY = bedPos.getY() + 4.0D / 16.0D;
         double dx = pet.getX() - centerX, dz = pet.getZ() - centerZ;
-        // A pet approaching on the adjacent full-height floor stands at bed Y + 1,
-        // while the mattress is only 4/16 of a block high (a 0.75-block difference).
-        // The old 0.6 threshold rejected normal approaches, causing endless circling.
-        if (dx * dx + dz * dz > 1.0D || Math.abs(pet.getY() - surfaceY) > 1.0D) return false;
+        if (dx * dx + dz * dz > 1.0D || Math.abs(pet.getY() - surfaceY) > 1.0D) {
+            return rejectAccommodation(level, "outside one-block arrival envelope");
+        }
         BlockPos current = pet.blockPosition();
-        int blockDx = Math.abs(current.getX() - bedPos.getX());
-        int blockDz = Math.abs(current.getZ() - bedPos.getZ());
-        // Restrict the accommodation step to a cardinal neighboring floor cell. This prevents
-        // a nearby pet on another level or behind an intervening block from being pulled onto the bed.
-        if ((current.getY() != bedPos.getY() && current.getY() != bedPos.getY() + 1)
-                || blockDx + blockDz > 1) return false;
-        var destination = pet.getBoundingBox().move(centerX - pet.getX(), surfaceY - pet.getY(), centerZ - pet.getZ());
-        return level.noCollision(pet, destination);
+        if (current.getY() != bedPos.getY() && current.getY() != bedPos.getY() + 1) {
+            return rejectAccommodation(level, "pet is on a different floor level");
+        }
+
+        double moveX = centerX - pet.getX();
+        double moveY = surfaceY - pet.getY();
+        double moveZ = centerZ - pet.getZ();
+        double distance = Math.sqrt(moveX * moveX + moveY * moveY + moveZ * moveZ);
+        int samples = Math.max(1, (int) Math.ceil(distance / 0.1D));
+        AABB startBox = pet.getBoundingBox();
+        for (int sample = 0; sample <= samples; sample++) {
+            double fraction = (double) sample / samples;
+            AABB sampleBox = startBox.move(moveX * fraction, moveY * fraction, moveZ * fraction);
+            String obstruction = findArrivalBlockCollision(level, sampleBox);
+            if (obstruction != null) return rejectAccommodation(level, obstruction);
+            if (!level.getEntities(pet, sampleBox, entity -> entity.isAlive() && entity.isPushable()).isEmpty()) {
+                return rejectAccommodation(level, "another entity obstructs the arrival corridor");
+            }
+        }
+        return true;
     }
 
+    private String findArrivalBlockCollision(ServerLevel level, AABB box) {
+        int minX = (int) Math.floor(box.minX), minY = (int) Math.floor(box.minY), minZ = (int) Math.floor(box.minZ);
+        int maxX = (int) Math.floor(box.maxX), maxY = (int) Math.floor(box.maxY), maxZ = (int) Math.floor(box.maxZ);
+        for (BlockPos pos : BlockPos.betweenClosed(minX, minY, minZ, maxX, maxY, maxZ)) {
+            if (pos.equals(bedPos)) continue;
+            if (!level.hasChunkAt(pos)) return "arrival corridor crosses an unloaded chunk";
+            var shape = level.getBlockState(pos).getCollisionShape(level, pos, CollisionContext.of(pet));
+            for (AABB collision : shape.toAabbs()) {
+                if (box.intersects(collision.move(pos.getX(), pos.getY(), pos.getZ()))) {
+                    return "arrival corridor blocked by " + level.getBlockState(pos).getBlock() + " at " + pos;
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean rejectAccommodation(ServerLevel level, String reason) {
+        long now = level.getGameTime();
+        if (now - lastAccommodationLogTime >= 1200L) {
+            LOGGER.warn("PetBed arrival alignment rejected for pet {} at {} toward bed {} in {}: {} (resting={}, navigationDone={})",
+                    pet.getUUID(), pet.position(), bedPos, level.dimension().location(), reason,
+                    pet.getPersistentData().getBoolean(RESTING_KEY), pet.getNavigation().isDone());
+            lastAccommodationLogTime = now;
+        }
+        return false;
+    }
     private boolean onRestSurface() {
         if (bedPos == null) return false;
         double dx = pet.getX() - (bedPos.getX() + .5D), dz = pet.getZ() - (bedPos.getZ() + .5D);
