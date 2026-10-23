@@ -93,15 +93,31 @@ public final class PetRestGoal extends Goal {
 
     @Override public void tick() {
         if (!(pet.level instanceof ServerLevel level) || bedPos == null) return;
-        if (retryDelay > 0) { retryDelay--; return; }
-
         boolean night = isNight(level);
-        if (night && PetLinkService.getMode(pet) == PetBedMode.SIT && !onRestSurface() && PetBedPets.isOrderedToSit(pet)) PetBedPets.setOrderedToSit(pet, false);
+        // Clear movement blockers before retry backoff. The selected mode remains persisted;
+        // only Vanilla's temporary sit command is suspended while the pet returns at night.
+        if (night) {
+            if (PetLinkService.getMode(pet) == PetBedMode.SIT && !onRestSurface()
+                    && PetBedPets.isOrderedToSit(pet)) {
+                PetBedPets.setOrderedToSit(pet, false);
+            }
+            if (pet.getPersistentData().getBoolean(RESTING_KEY) && !onRestSurface()) {
+                pet.getPersistentData().putBoolean(RESTING_KEY, false);
+            }
+        }
+        if (retryDelay > 0) { retryDelay--; return; }
 
         if (onRestSurface()) {
             rest();
             return;
         }
+        // A one-block final alignment is valid only from the adjacent, same-level approach cell.
+        // The path to this cell is still followed using the species' normal PathNavigation.
+        if ((night || !insideArea()) && canAlignFromCurrentPosition()) {
+            rest();
+            return;
+        }
+
         if (atApproach()) {
             if (canAlignFromCurrentPosition()) {
                 rest();
@@ -168,7 +184,7 @@ public final class PetRestGoal extends Goal {
         // different side gives the pathfinder real alternatives around walls; final alignment stays short.
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
-                if (dx == 0 && dz == 0) continue;
+                if (Math.abs(dx) + Math.abs(dz) != 1) continue;
                 BlockPos candidate = bedPos.offset(dx, 0, dz);
                 if (candidate.equals(excludedApproach) || !level.hasChunkAt(candidate)) continue;
                 Path path = pet.getNavigation().createPath(candidate, 0);
@@ -219,8 +235,13 @@ public final class PetRestGoal extends Goal {
         double centerX = bedPos.getX() + .5D, centerZ = bedPos.getZ() + .5D;
         double surfaceY = bedPos.getY() + 4.0D / 16.0D;
         double dx = pet.getX() - centerX, dz = pet.getZ() - centerZ;
-        if (dx * dx + dz * dz > 2.25D || Math.abs(pet.getY() - surfaceY) > 1.5D) return false;
-        // Validate the actual final entity bounds so a blocked bed cannot pull the pet through a wall.
+        if (dx * dx + dz * dz > 1.0D || Math.abs(pet.getY() - surfaceY) > 0.6D) return false;
+        BlockPos current = pet.blockPosition();
+        int blockDx = Math.abs(current.getX() - bedPos.getX());
+        int blockDz = Math.abs(current.getZ() - bedPos.getZ());
+        // Restrict the accommodation step to a cardinal neighboring floor cell. This prevents
+        // a nearby pet on another level or behind an intervening block from being pulled onto the bed.
+        if (current.getY() != bedPos.getY() || blockDx + blockDz != 1) return false;
         var destination = pet.getBoundingBox().move(centerX - pet.getX(), surfaceY - pet.getY(), centerZ - pet.getZ());
         return level.noCollision(pet, destination);
     }

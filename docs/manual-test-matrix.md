@@ -89,3 +89,23 @@ These tests require a live Forge 1.19.2 world. CI source checks/build do not exe
 | N12 | Wolf, cat, and parrot: validate species-specific navigator behavior | Manual pending |
 
 No in-game GameTest runner is currently configured. These scenarios are not reported as passed until exercised in Minecraft/Forge.
+
+## Regression checks: one-block accommodation and seated night return
+
+These tests require a live Forge world; CI does not simulate entity movement or nighttime AI.
+
+| # | Scenario | Status |
+| --- | --- | --- |
+| A1 | Pet reaches an adjacent floor cell within one block and is aligned once | Manual pending |
+| A2 | Pet outside one-block radius continues normal path navigation | Manual pending |
+| A3 | Pet near the bed on another floor is not aligned through the floor | Manual pending |
+| A4 | Nearby pet separated by a wall/blocked destination is not pulled through it | Manual pending |
+| A5 | Pet stops navigating and stays stable after accommodation | Manual pending |
+| S1 | Link an already seated pet during daytime; verify night return | Manual pending |
+| S2 | Link an already seated pet during nighttime; verify immediate return | Manual pending |
+| S3 | Mode SIT is temporarily released at night and persists after dawn | Manual pending |
+| S4 | Night retry delay does not leave sitting/rest flags blocking movement | Manual pending |
+| S5 | Save/reload a seated linked pet during night; verify return resumes | Manual pending |
+| S6 | Repeat arrival and sit-return checks with wolf, cat, and parrot | Manual pending |
+
+Historical comparison: the earlier goal used a simple near-bed distance check and cleared the Vanilla sit order during night, but did not verify route progress or destination collision. The current implementation preserves the night sit release and adds bounded, same-level final accommodation after normal navigation. No historical source was restored wholesale.
