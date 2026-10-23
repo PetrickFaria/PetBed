@@ -83,7 +83,7 @@ for marker in ("createPath(candidate, 0)", "path.canReach()", "moveTo(candidate.
         raise SystemExit(f"Pet rest behavior is missing required path/stability check: {marker}")
 if "noPhysics" in rest_source or "teleportTo" in rest_source:
     raise SystemExit("Pet return/rest logic must retain block collision and avoid teleporting")
-for marker in ("if (retryDelay > 0 && !night)", "canAlignFromCurrentPosition()", "navigate(failedApproach)", "isNearApproach()", "level.noCollision(pet, destination)", "if (retryDelay > 0) { retryDelay--; return; }", "blockDx + blockDz != 1"):
+for marker in ("if (retryDelay > 0 && !night)", "canAlignFromCurrentPosition()", "navigate(failedApproach)", "isNearApproach()", "level.noCollision(pet, destination)", "if (retryDelay > 0) { retryDelay--; return; }", "blockDx + blockDz != 1", "!onRestSurface() && PetBedPets.isOrderedToSit(pet)"):
     if marker not in rest_source:
         raise SystemExit(f"Pet night return is missing its state/path/arrival guard: {marker}")
 collision_source = collision_mixin.read_text(encoding="utf-8")

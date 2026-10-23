@@ -60,7 +60,8 @@ public final class PetRestGoal extends Goal {
         // Night return outranks daytime sitting and any retry backoff carried over from roaming.
         // Clear stale rest protection before allowing the goal selector to choose another movement goal.
         if (night) {
-            if (PetLinkService.getMode(pet) == PetBedMode.SIT && PetBedPets.isOrderedToSit(pet)) {
+            if (!onRestSurface() && PetBedPets.isOrderedToSit(pet)) {
+                // The PetBed mode is stored separately; suspend only the entity's sit command.
                 PetBedPets.setOrderedToSit(pet, false);
             }
             if (pet.getPersistentData().getBoolean(RESTING_KEY) && !onRestSurface()) {
@@ -97,8 +98,7 @@ public final class PetRestGoal extends Goal {
         // Clear movement blockers before retry backoff. The selected mode remains persisted;
         // only Vanilla's temporary sit command is suspended while the pet returns at night.
         if (night) {
-            if (PetLinkService.getMode(pet) == PetBedMode.SIT && !onRestSurface()
-                    && PetBedPets.isOrderedToSit(pet)) {
+            if (!onRestSurface() && PetBedPets.isOrderedToSit(pet)) {
                 PetBedPets.setOrderedToSit(pet, false);
             }
             if (pet.getPersistentData().getBoolean(RESTING_KEY) && !onRestSurface()) {
