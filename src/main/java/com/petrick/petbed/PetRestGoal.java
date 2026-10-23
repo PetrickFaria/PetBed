@@ -163,14 +163,12 @@ public final class PetRestGoal extends Goal {
         if (!(pet.level instanceof ServerLevel level) || bedPos == null || !level.hasChunkAt(bedPos)
                 || !PetLinkService.isLinkValid(pet, level, bedPos)) return false;
 
-        List<ApproachPath> candidates = new ArrayList<>(24);
-        // Search reachable standing positions around the bed with this species' own navigator.
-        // The wider ring lets pathfinding route around nearby walls instead of repeatedly targeting
-        // a blocked adjacent cell. The final alignment is a separate, short, collision-checked step.
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dz = -2; dz <= 2; dz++) {
-                int radius = Math.max(Math.abs(dx), Math.abs(dz));
-                if (radius == 0 || radius > 2) continue;
+        List<ApproachPath> candidates = new ArrayList<>(8);
+        // Search each adjacent standing position with this species' own navigator. Reaching a
+        // different side gives the pathfinder real alternatives around walls; final alignment stays short.
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
                 BlockPos candidate = bedPos.offset(dx, 0, dz);
                 if (candidate.equals(excludedApproach) || !level.hasChunkAt(candidate)) continue;
                 Path path = pet.getNavigation().createPath(candidate, 0);
@@ -204,7 +202,7 @@ public final class PetRestGoal extends Goal {
     }
 
     private boolean atApproach() {
-        return isNearApproach() && (pet.getNavigation().isDone() || canAlignFromCurrentPosition());
+        return isNearApproach() && pet.getNavigation().isDone();
     }
 
     private boolean isNearApproach() {
@@ -221,7 +219,7 @@ public final class PetRestGoal extends Goal {
         double centerX = bedPos.getX() + .5D, centerZ = bedPos.getZ() + .5D;
         double surfaceY = bedPos.getY() + 4.0D / 16.0D;
         double dx = pet.getX() - centerX, dz = pet.getZ() - centerZ;
-        if (dx * dx + dz * dz > 4.0D || Math.abs(pet.getY() - surfaceY) > 1.5D) return false;
+        if (dx * dx + dz * dz > 2.25D || Math.abs(pet.getY() - surfaceY) > 1.5D) return false;
         // Validate the actual final entity bounds so a blocked bed cannot pull the pet through a wall.
         var destination = pet.getBoundingBox().move(centerX - pet.getX(), surfaceY - pet.getY(), centerZ - pet.getZ());
         return level.noCollision(pet, destination);
