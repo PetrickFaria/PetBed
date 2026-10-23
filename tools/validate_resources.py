@@ -83,7 +83,7 @@ for marker in ("createPath(candidate, 0)", "path.canReach()", "moveTo(candidate.
         raise SystemExit(f"Pet rest behavior is missing required path/stability check: {marker}")
 if "noPhysics" in rest_source or "teleportTo" in rest_source:
     raise SystemExit("Pet return/rest logic must retain block collision and avoid teleporting")
-for marker in ("if (retryDelay > 0 && !night)", "canAlignFromCurrentPosition()", "navigate(failedApproach)", "isNearApproach()", "findArrivalBlockCollision(level, sampleBox)", "if (pos.equals(bedPos)) continue;", "another entity obstructs the arrival corridor", "lastAccommodationLogTime", "if (retryDelay > 0) { retryDelay--; return; }", "!onRestSurface() && PetBedPets.isOrderedToSit(pet)", "withinNightRecognitionRange(bedPos)", "50.0D * 50.0D", "if (night && (!level.hasChunkAt(bedPos) || !withinNightRecognitionRange(bedPos))) return false;"):
+for marker in ("if (retryDelay > 0 && !night)", "canAlignFromCurrentPosition()", "navigate(failedApproach)", "isNearApproach()", "findArrivalBlockCollision(level, sampleBox)", "if (pos.equals(bedPos)) continue;", "another entity obstructs the arrival corridor", "lastAccommodationLogTime", "if (retryDelay > 0) { retryDelay--; return; }", "!onRestSurface() && PetBedPets.isOrderedToSit(pet)", "withinNightRecognitionRange(bedPos)", "100.0D * 100.0D", "if (night && (!level.hasChunkAt(bedPos) || !withinNightRecognitionRange(bedPos))) return false;"):
     if marker not in rest_source:
         raise SystemExit(f"Pet night return is missing its state/path/arrival/range guard: {marker}")
 can_use = rest_source.split("boolean canUse()", 1)[1].split("@Override public boolean canContinueToUse()", 1)[0]
