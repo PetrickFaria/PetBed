@@ -109,3 +109,44 @@ These tests require a live Forge world; CI does not simulate entity movement or 
 | S6 | Repeat arrival and sit-return checks with wolf, cat, and parrot | Manual pending |
 
 Historical comparison: the earlier goal used a simple near-bed distance check and cleared the Vanilla sit order during night, but did not verify route progress or destination collision. The current implementation preserves the night sit release and adds bounded, same-level final accommodation after normal navigation. No historical source was restored wholesale.
+
+## Regression checks: diagnósticos de chegada
+
+Estas validações precisam de um mundo Forge ativo; CI verifica a lógica estática e compila, mas não simula colisões ou navegação em terreno.
+
+| # | Cenário | Estado |
+| --- | --- | --- |
+| D1 | Pet dentro de 1 bloco em uma posição diagonal acessível é alinhado uma única vez | Manual pendente |
+| D2 | Pet além do raio de 1 bloco continua usando navegação normal | Manual pendente |
+| D3 | Parede ou bloco na trajetória curta impede o alinhamento | Manual pendente |
+| D4 | A forma de colisão da própria caminha não impede a chegada sobre a almofada | Manual pendente |
+| D5 | Corredor atravessando chunk descarregado não o carrega e rejeita o alinhamento | Manual pendente |
+| D6 | Log registra a causa concreta de cada rejeição (com limite de frequência) | Manual pendente |
+| D7 | Depois do alinhamento, o pet permanece centralizado sem tremor | Manual pendente |
+
+O código anterior rejeitava toda posição cujo bloco fosse diagonal ao bloco da caminha (`blockDx + blockDz > 1`), inclusive quando a distância real era de até 1 bloco. A implementação atual remove essa restrição por célula, verifica a caixa do pet ao longo do deslocamento curto e ignora apenas a colisão da própria caminha, que é o destino. O registro identifica bloqueio por bloco/entidade, nível de piso, chunk descarregado ou distância. O motivo observado no caso do jogador ainda precisa ser confirmado com o log dentro do jogo.
+
+
+## Regression checks: alcance noturno de 100 blocos
+
+Estes cenários precisam de um mundo Forge ativo; a CI valida a lógica e compila o mod, mas não executa o seletor de objetivos, a navegação, nem a física do jogo.
+
+| # | Cenário | Estado |
+| --- | --- | --- |
+| R100-1 | Pet a 25 blocos é elegível ao retorno noturno | Manual pendente |
+| R100-2 | Pet a 50 blocos é elegível ao retorno noturno | Manual pendente |
+| R100-3 | Pet a 75 blocos é elegível ao retorno noturno | Manual pendente |
+| R100-4 | Pet a 99 blocos é elegível ao retorno noturno | Manual pendente |
+| R100-5 | Pet exatamente a 100 blocos é elegível ao retorno noturno | Manual pendente |
+| R100-6 | Pet a 101 blocos não inicia o retorno por alcance e mantém vínculo | Manual pendente |
+| R100-7 | Repetir limites com pets sentados e em pé nos modos Livre, Seguir e Sentar | Manual pendente |
+| R100-8 | Vincular pet sentado durante a noite e confirmar início no próximo ciclo normal de IA | Manual pendente |
+| R100-9 | Wolf, cat, parrot e outras espécies compatíveis usam seus navegadores sem alterar comportamento diurno | Manual pendente |
+| R100-10 | Caminho com obstáculos e passagens: o pet contorna obstáculos até a caminha | Manual pendente |
+| R100-11 | Chegada preserva centralização, orientação, colisões e proteção contra empurrões | Manual pendente |
+| R100-12 | Salvar/recarregar preserva o vínculo e o retorno noturno | Manual pendente |
+| R100-13 | As opções de área diurna 15×15, 30×30, 45×45, 50×50 e 75×75 não são alteradas | Manual pendente |
+
+O limite é euclidiano 3D, calculado da posição do pet até o centro da superfície da almofada, e é inclusivo. Ele condiciona somente a ativação do retorno noturno; não altera o vínculo persistido nem as áreas de movimentação diurna. A rotina aguarda se a caminha não estiver carregada e não força o carregamento de chunks.
+
+A CI não possui GameTest configurado para simular IA e pathfinding. Todos os cenários R100 continuam pendentes de validação dentro do Minecraft.
