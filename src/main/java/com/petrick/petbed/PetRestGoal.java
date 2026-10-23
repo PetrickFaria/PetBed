@@ -235,13 +235,17 @@ public final class PetRestGoal extends Goal {
         double centerX = bedPos.getX() + .5D, centerZ = bedPos.getZ() + .5D;
         double surfaceY = bedPos.getY() + 4.0D / 16.0D;
         double dx = pet.getX() - centerX, dz = pet.getZ() - centerZ;
-        if (dx * dx + dz * dz > 1.0D || Math.abs(pet.getY() - surfaceY) > 0.6D) return false;
+        // A pet approaching on the adjacent full-height floor stands at bed Y + 1,
+        // while the mattress is only 4/16 of a block high (a 0.75-block difference).
+        // The old 0.6 threshold rejected normal approaches, causing endless circling.
+        if (dx * dx + dz * dz > 1.0D || Math.abs(pet.getY() - surfaceY) > 1.0D) return false;
         BlockPos current = pet.blockPosition();
         int blockDx = Math.abs(current.getX() - bedPos.getX());
         int blockDz = Math.abs(current.getZ() - bedPos.getZ());
         // Restrict the accommodation step to a cardinal neighboring floor cell. This prevents
         // a nearby pet on another level or behind an intervening block from being pulled onto the bed.
-        if (current.getY() != bedPos.getY() || blockDx + blockDz > 1) return false;
+        if ((current.getY() != bedPos.getY() && current.getY() != bedPos.getY() + 1)
+                || blockDx + blockDz > 1) return false;
         var destination = pet.getBoundingBox().move(centerX - pet.getX(), surfaceY - pet.getY(), centerZ - pet.getZ());
         return level.noCollision(pet, destination);
     }
