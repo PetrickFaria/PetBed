@@ -125,3 +125,26 @@ Estas validações precisam de um mundo Forge ativo; CI verifica a lógica está
 | D7 | Depois do alinhamento, o pet permanece centralizado sem tremor | Manual pendente |
 
 O código anterior rejeitava toda posição cujo bloco fosse diagonal ao bloco da caminha (`blockDx + blockDz > 1`), inclusive quando a distância real era de até 1 bloco. A implementação atual remove essa restrição por célula, verifica a caixa do pet ao longo do deslocamento curto e ignora apenas a colisão da própria caminha, que é o destino. O registro identifica bloqueio por bloco/entidade, nível de piso, chunk descarregado ou distância. O motivo observado no caso do jogador ainda precisa ser confirmado com o log dentro do jogo.
+
+
+## Regression checks: alcance noturno de 50 blocos
+
+Estas verificações requerem jogo Forge ativo. A checagem estática e a compilação não executam o seletor de objetivos, a navegação, nem a atualização do mundo ao vincular durante a noite.
+
+| # | Cenário | Estado |
+| --- | --- | --- |
+| R50-1 | Lobo sentado a 10 blocos inicia retorno à noite e efetivamente deixa de executar SitWhenOrderedToGoal | Manual pendente |
+| R50-2 | Lobo sentado a 25 blocos inicia pathfinding e caminha até a caminha | Manual pendente |
+| R50-3 | Gato sentado a 40 blocos inicia retorno noturno | Manual pendente |
+| R50-4 | Papagaio sentado exatamente a 50 blocos é elegível, sujeito à navegação possível da espécie | Manual pendente |
+| R50-5 | Pet além de 50 blocos não inicia retorno e conserva vínculo, modo e estado diurno | Manual pendente |
+| R50-6 | Vincular pet sentado a até 50 blocos durante a noite inicia o retorno no próximo ciclo normal de IA, sem aguardar novo anoitecer | Manual pendente |
+| R50-7 | Pet em pé a até 50 blocos retorna normalmente | Manual pendente |
+| R50-8 | Modo SIT é suspenso apenas enquanto retorna/descansa e permanece salvo | Manual pendente |
+| R50-9 | Obstáculos e rota alternativa são respeitados durante retorno a 10/25/40/50 blocos | Manual pendente |
+| R50-10 | Chegada e alinhamento central não giram, inclusive após salvar/recarregar | Manual pendente |
+| R50-11 | Pet ou caminha em chunk descarregado mantém vínculo e retoma verificação após carregar | Manual pendente |
+
+A rotina de elegibilidade verifica distância euclidiana 3D entre a posição do pet e o centro da superfície da almofada, com limite inclusivo de 50 blocos. Ela só libera a ordem Vanilla de sentar à noite depois de confirmar distância e chunk carregado; a ordem de modo escolhido continua nos dados do vínculo. A elegibilidade é consultada pelo próprio objetivo de IA em cada oportunidade normal, por isso um vínculo criado à noite não depende de um evento de transição dia/noite.
+
+A CI não dispõe de GameTest configurado e não simula o seletor de objetivos nem a navegação de wolf/cat/parrot. Todos os cenários R50 permanecem manuais até serem testados dentro do Minecraft.
