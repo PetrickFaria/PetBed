@@ -60,6 +60,9 @@ public final class PetRestGoal extends Goal {
         bedPos = readBedPos(level);
         if (bedPos == null) return false;
         boolean night = isNight(level);
+        // Recognition is a 3D radius around the mattress. Keep the bond intact and do not
+        // release Vanilla sitting when either endpoint is outside the active, loaded area.
+        if (night && (!level.hasChunkAt(bedPos) || !withinNightRecognitionRange(bedPos))) return false;
         // Night return outranks daytime sitting and any retry backoff carried over from roaming.
         // Clear stale rest protection before allowing the goal selector to choose another movement goal.
         if (night) {
@@ -327,6 +330,13 @@ public final class PetRestGoal extends Goal {
         pet.fallDistance = 0.0F;
         pet.getPersistentData().putBoolean(RESTING_KEY, true);
         if (PetLinkService.getMode(pet) == PetBedMode.SIT) PetBedPets.setOrderedToSit(pet, true);
+    }
+
+    private boolean withinNightRecognitionRange(BlockPos bed) {
+        double dx = pet.getX() - (bed.getX() + .5D);
+        double dy = pet.getY() - (bed.getY() + 4.0D / 16.0D);
+        double dz = pet.getZ() - (bed.getZ() + .5D);
+        return dx * dx + dy * dy + dz * dz <= 50.0D * 50.0D;
     }
 
     private boolean insideArea() { return bedPos != null && PetBedArea.contains(bedPos, pet.getX(), pet.getZ(), PetLinkService.getAreaSize(pet)); }
