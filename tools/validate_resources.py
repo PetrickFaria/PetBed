@@ -83,9 +83,15 @@ for marker in ("createPath(candidate, 0)", "path.canReach()", "moveTo(candidate.
         raise SystemExit(f"Pet rest behavior is missing required path/stability check: {marker}")
 if "noPhysics" in rest_source or "teleportTo" in rest_source:
     raise SystemExit("Pet return/rest logic must retain block collision and avoid teleporting")
-for marker in ("if (retryDelay > 0 && !night)", "canAlignFromCurrentPosition()", "navigate(failedApproach)", "isNearApproach()", "findArrivalBlockCollision(level, sampleBox)", "if (pos.equals(bedPos)) continue;", "another entity obstructs the arrival corridor", "lastAccommodationLogTime", "if (retryDelay > 0) { retryDelay--; return; }", "!onRestSurface() && PetBedPets.isOrderedToSit(pet)"):
+for marker in ("if (retryDelay > 0 && !night)", "canAlignFromCurrentPosition()", "navigate(failedApproach)", "isNearApproach()", "findArrivalBlockCollision(level, sampleBox)", "if (pos.equals(bedPos)) continue;", "another entity obstructs the arrival corridor", "lastAccommodationLogTime", "if (retryDelay > 0) { retryDelay--; return; }", "!onRestSurface() && PetBedPets.isOrderedToSit(pet)", "withinNightRecognitionRange(bedPos)", "50.0D * 50.0D", "if (night && (!level.hasChunkAt(bedPos) || !withinNightRecognitionRange(bedPos))) return false;"):
     if marker not in rest_source:
-        raise SystemExit(f"Pet night return is missing its state/path/arrival guard: {marker}")
+        raise SystemExit(f"Pet night return is missing its state/path/arrival/range guard: {marker}")
+can_use = rest_source.split("boolean canUse()", 1)[1].split("@Override public boolean canContinueToUse()", 1)[0]
+if can_use.index("withinNightRecognitionRange(bedPos)") > can_use.index("PetBedPets.setOrderedToSit(pet, false)"):
+    raise SystemExit("Night distance and loaded-bed checks must run before releasing the pet's sit order")
+behavior_events = (ROOT / "src/main/java/com/petrick/petbed/PetBehaviorEvents.java").read_text(encoding="utf-8")
+if "pet.goalSelector.addGoal(0, new PetRestGoal(pet))" not in behavior_events:
+    raise SystemExit("Night return goal must outrank vanilla sit and movement goals")
 collision_source = collision_mixin.read_text(encoding="utf-8")
 if 'method = "isPushable"' not in collision_source or "isRestingLinkedPet" not in collision_source:
     raise SystemExit("Entity collision guard must be conditional on linked-pet rest state")
