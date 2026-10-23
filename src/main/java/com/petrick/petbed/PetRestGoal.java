@@ -88,7 +88,7 @@ public final class PetRestGoal extends Goal {
         stalledTicks = 0;
         failedAttempts = 0;
         stuckReplans = 0;
-        if (onRestSurface()) rest();
+        if (onRestSurface() || canAlignFromCurrentPosition()) rest();
         else if (!navigate()) scheduleRetry();
     }
 
@@ -241,7 +241,7 @@ public final class PetRestGoal extends Goal {
         int blockDz = Math.abs(current.getZ() - bedPos.getZ());
         // Restrict the accommodation step to a cardinal neighboring floor cell. This prevents
         // a nearby pet on another level or behind an intervening block from being pulled onto the bed.
-        if (current.getY() != bedPos.getY() || blockDx + blockDz != 1) return false;
+        if (current.getY() != bedPos.getY() || blockDx + blockDz > 1) return false;
         var destination = pet.getBoundingBox().move(centerX - pet.getX(), surfaceY - pet.getY(), centerZ - pet.getZ());
         return level.noCollision(pet, destination);
     }
