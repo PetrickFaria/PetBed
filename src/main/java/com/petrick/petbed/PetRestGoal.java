@@ -336,7 +336,7 @@ public final class PetRestGoal extends Goal {
         double dx = pet.getX() - (bed.getX() + .5D);
         double dy = pet.getY() - (bed.getY() + 4.0D / 16.0D);
         double dz = pet.getZ() - (bed.getZ() + .5D);
-        return dx * dx + dy * dy + dz * dz <= 50.0D * 50.0D;
+        return dx * dx + dy * dy + dz * dz <= 100.0D * 100.0D;
     }
 
     private boolean insideArea() { return bedPos != null && PetBedArea.contains(bedPos, pet.getX(), pet.getZ(), PetLinkService.getAreaSize(pet)); }
