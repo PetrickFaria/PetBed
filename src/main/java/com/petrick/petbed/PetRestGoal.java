@@ -54,11 +54,20 @@ public final class PetRestGoal extends Goal {
 
     @Override public boolean canUse() {
         if (!(pet.level instanceof ServerLevel level) || !pet.isAlive() || !PetBedPets.isTamedPet(pet)) return false;
-        if (retryDelay > 0) { retryDelay--; return false; }
         bedPos = readBedPos(level);
         if (bedPos == null) return false;
         boolean night = isNight(level);
-        if (night && PetLinkService.getMode(pet) == PetBedMode.SIT && PetBedPets.isOrderedToSit(pet)) PetBedPets.setOrderedToSit(pet, false);
+        // Night return outranks daytime sitting and any retry backoff carried over from roaming.
+        // Clear stale rest protection before allowing the goal selector to choose another movement goal.
+        if (night) {
+            if (PetLinkService.getMode(pet) == PetBedMode.SIT && PetBedPets.isOrderedToSit(pet)) {
+                PetBedPets.setOrderedToSit(pet, false);
+            }
+            if (pet.getPersistentData().getBoolean(RESTING_KEY) && !onRestSurface()) {
+                pet.getPersistentData().putBoolean(RESTING_KEY, false);
+            }
+        }
+        if (retryDelay > 0 && !night) { retryDelay--; return false; }
         boolean seatedRest = PetLinkService.getMode(pet) == PetBedMode.SIT
                 && pet.getPersistentData().getBoolean(RESTING_KEY) && onRestSurface();
         return night || seatedRest || (PetLinkService.getMode(pet) != PetBedMode.SIT && !insideArea());
@@ -94,14 +103,26 @@ public final class PetRestGoal extends Goal {
             return;
         }
         if (atApproach()) {
-            rest();
+            if (canAlignFromCurrentPosition()) {
+                rest();
+            } else {
+                BlockPos failedApproach = approachPos;
+                approachPos = null;
+                if (!navigate(failedApproach)) scheduleRetry();
+            }
             return;
         }
 
         pet.getPersistentData().putBoolean(RESTING_KEY, false);
         if (pet.getNavigation().isDone()) {
-            if (night || !insideArea()) {
-                if (!navigate()) scheduleRetry();
+            // Navigation may stop within its tolerance radius. Confirm the reached waypoint is
+            // actually close and collision-clear before the final bed alignment.
+            if (approachPos != null && isNearApproach() && canAlignFromCurrentPosition()) {
+                rest();
+            } else if (night || !insideArea()) {
+                BlockPos failedApproach = approachPos;
+                approachPos = null;
+                if (!navigate(failedApproach)) scheduleRetry();
             }
             return;
         }
@@ -136,18 +157,22 @@ public final class PetRestGoal extends Goal {
         stalledTicks = 0;
     }
 
-    private boolean navigate() {
+    private boolean navigate() { return navigate(null); }
+
+    private boolean navigate(BlockPos excludedApproach) {
         if (!(pet.level instanceof ServerLevel level) || bedPos == null || !level.hasChunkAt(bedPos)
                 || !PetLinkService.isLinkValid(pet, level, bedPos)) return false;
 
-        List<ApproachPath> candidates = new ArrayList<>(8);
-        // The bed itself is a low collision block and is a poor path target. Find a reachable adjacent
-        // standing position with the entity's own PathNavigation, then align only after reaching it.
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                if (dx == 0 && dz == 0) continue;
+        List<ApproachPath> candidates = new ArrayList<>(24);
+        // Search reachable standing positions around the bed with this species' own navigator.
+        // The wider ring lets pathfinding route around nearby walls instead of repeatedly targeting
+        // a blocked adjacent cell. The final alignment is a separate, short, collision-checked step.
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                int radius = Math.max(Math.abs(dx), Math.abs(dz));
+                if (radius == 0 || radius > 2) continue;
                 BlockPos candidate = bedPos.offset(dx, 0, dz);
-                if (!level.hasChunkAt(candidate)) continue;
+                if (candidate.equals(excludedApproach) || !level.hasChunkAt(candidate)) continue;
                 Path path = pet.getNavigation().createPath(candidate, 0);
                 if (path != null && path.canReach()) candidates.add(new ApproachPath(candidate, path));
             }
@@ -179,10 +204,27 @@ public final class PetRestGoal extends Goal {
     }
 
     private boolean atApproach() {
+        return isNearApproach() && (pet.getNavigation().isDone() || canAlignFromCurrentPosition());
+    }
+
+    private boolean isNearApproach() {
         if (approachPos == null) return false;
         double dx = pet.getX() - (approachPos.getX() + .5D);
         double dz = pet.getZ() - (approachPos.getZ() + .5D);
-        return dx * dx + dz * dz <= .36D && Math.abs(pet.getY() - approachPos.getY()) <= 1.0D;
+        return dx * dx + dz * dz <= 1.21D && Math.abs(pet.getY() - approachPos.getY()) <= 1.0D;
+    }
+
+    /** Final alignment is allowed only from a genuinely reached nearby waypoint and a clear destination. */
+    private boolean canAlignFromCurrentPosition() {
+        if (!(pet.level instanceof ServerLevel level) || bedPos == null || !level.hasChunkAt(bedPos)) return false;
+        if (onRestSurface()) return true;
+        double centerX = bedPos.getX() + .5D, centerZ = bedPos.getZ() + .5D;
+        double surfaceY = bedPos.getY() + 4.0D / 16.0D;
+        double dx = pet.getX() - centerX, dz = pet.getZ() - centerZ;
+        if (dx * dx + dz * dz > 4.0D || Math.abs(pet.getY() - surfaceY) > 1.5D) return false;
+        // Validate the actual final entity bounds so a blocked bed cannot pull the pet through a wall.
+        var destination = pet.getBoundingBox().move(centerX - pet.getX(), surfaceY - pet.getY(), centerZ - pet.getZ());
+        return level.noCollision(pet, destination);
     }
 
     private boolean onRestSurface() {
@@ -193,7 +235,7 @@ public final class PetRestGoal extends Goal {
     }
 
     private void rest() {
-        if (bedPos == null) return;
+        if (bedPos == null || !canAlignFromCurrentPosition()) return;
         if (!PetLinkService.hasLinkMarker(pet) || !(pet.level instanceof ServerLevel level)
                 || !level.hasChunkAt(bedPos) || !PetLinkService.isLinkValid(pet, level, bedPos)) return;
 

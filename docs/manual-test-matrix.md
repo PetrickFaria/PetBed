@@ -67,3 +67,25 @@ These cases need an in-game Forge world; the source checks and build do not simu
 | R20 | Confirm final alignment occurs only after reaching an adjacent path waypoint | Manual pending |
 | R21 | Confirm night return works with each configured movement area | Manual pending |
 | R22 | Confirm no return-path teleport occurs | Manual pending |
+
+
+## Regression checks: night retry and arrival validation
+
+These tests require a live Forge 1.19.2 world. CI source checks/build do not execute entity navigation or collision physics.
+
+| # | Scenario | Status |
+| --- | --- | --- |
+| N1 | At night, a linked pet in FREE mode starts a reachable return route | Manual pending |
+| N2 | At night, a linked pet in SIT mode is released from sitting and starts route | Manual pending |
+| N3 | At night, a linked pet in FOLLOW mode stops following and starts route | Manual pending |
+| N4 | Pet with a daytime retry delay starts night return immediately | Manual pending |
+| N5 | Pet with stale resting marker away from bed clears marker and walks | Manual pending |
+| N6 | Wall with lateral passage: pet follows an alternate route and actually arrives | Manual pending |
+| N7 | Multi-turn obstacle course: pet makes progress and reaches the bed | Manual pending |
+| N8 | Unreachable bed: no wall crossing; route retries remain rate-limited | Manual pending |
+| N9 | Arrival tolerance: pet rests only after reaching a nearby waypoint | Manual pending |
+| N10 | Blocked arrival: destination collision prevents final alignment | Manual pending |
+| N11 | Reload pet during night: route is restarted when entity/chunks load | Manual pending |
+| N12 | Wolf, cat, and parrot: validate species-specific navigator behavior | Manual pending |
+
+No in-game GameTest runner is currently configured. These scenarios are not reported as passed until exercised in Minecraft/Forge.
