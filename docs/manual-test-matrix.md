@@ -109,3 +109,19 @@ These tests require a live Forge world; CI does not simulate entity movement or 
 | S6 | Repeat arrival and sit-return checks with wolf, cat, and parrot | Manual pending |
 
 Historical comparison: the earlier goal used a simple near-bed distance check and cleared the Vanilla sit order during night, but did not verify route progress or destination collision. The current implementation preserves the night sit release and adds bounded, same-level final accommodation after normal navigation. No historical source was restored wholesale.
+
+## Regression checks: diagnósticos de chegada
+
+Estas validações precisam de um mundo Forge ativo; CI verifica a lógica estática e compila, mas não simula colisões ou navegação em terreno.
+
+| # | Cenário | Estado |
+| --- | --- | --- |
+| D1 | Pet dentro de 1 bloco em uma posição diagonal acessível é alinhado uma única vez | Manual pendente |
+| D2 | Pet além do raio de 1 bloco continua usando navegação normal | Manual pendente |
+| D3 | Parede ou bloco na trajetória curta impede o alinhamento | Manual pendente |
+| D4 | A forma de colisão da própria caminha não impede a chegada sobre a almofada | Manual pendente |
+| D5 | Corredor atravessando chunk descarregado não o carrega e rejeita o alinhamento | Manual pendente |
+| D6 | Log registra a causa concreta de cada rejeição (com limite de frequência) | Manual pendente |
+| D7 | Depois do alinhamento, o pet permanece centralizado sem tremor | Manual pendente |
+
+O código anterior rejeitava toda posição cujo bloco fosse diagonal ao bloco da caminha (`blockDx + blockDz > 1`), inclusive quando a distância real era de até 1 bloco. A implementação atual remove essa restrição por célula, verifica a caixa do pet ao longo do deslocamento curto e ignora apenas a colisão da própria caminha, que é o destino. O registro identifica bloqueio por bloco/entidade, nível de piso, chunk descarregado ou distância. O motivo observado no caso do jogador ainda precisa ser confirmado com o log dentro do jogo.
